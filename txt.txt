@@ -1,0 +1,157 @@
+Cria uma tela de frontend profissional e moderna para a marca AMBEBE (Empresa: AMBEBE CORP), totalmente integrada a um backend já existente.
+
+⚠️ Regra obrigatória:
+NENHUM dado pode ser estático ou mockado.
+Todos os dados DEVEM ser buscados exclusivamente a partir dos endpoints reais já disponíveis no backend.
+
+Objetivo
+
+Construir uma interface frontend que:
+
+Consome diretamente os endpoints existentes do backend
+
+Se adapta automaticamente à estrutura real dos dados retornados
+
+Reflete estados reais da API (loading, erro, vazio, sucesso)
+
+Seja escalável, tipada e pronta para produção
+
+Stack obrigatória
+
+Framework: Next.js (App Router)
+
+Linguagem: TypeScript (tipagem baseada nas respostas reais da API)
+
+Estilização: Tailwind CSS
+
+UI: Radix UI + shadcn-ui
+
+Comunicação com API: Axios
+
+Identidade visual (obrigatória)
+Função	Cor	Hex
+Fundo	Cinza Claro	#F8FAFC
+Primária	Azul Tech	#2563EB
+Sucesso	Verde	#22C55E
+Texto	Cinza Escuro	#334155
+
+Estilo: tecnologia + inovação + confiança
+Integração com Backend (CRÍTICO)
+Regras absolutas
+
+Descobrir e consumir os endpoints existentes
+Não inventar estruturas de dados
+
+Inferir tipos a partir das respostas reais da API
+Usar .env para BASE_URL
+Tratar erros reais da API
+Nunca retornar dados falsos em caso de erro.
+Requisitos da Tela (UI/UX)
+1. Header
+
+Marca: AMBEBE
+
+Campo de pesquisa (conectado ao backend, se disponível)
+
+Ícone de carrinho (contador vindo da API)
+
+Área de autenticação (estado real: logado / não logado)
+2. Área Principal (dados do backend)
+
+Listagem de produtos vindos do endpoint
+
+Cards com:
+
+Imagem (URL da API)
+
+Nome
+
+Preço
+
+Estado (disponível / indisponível)
+
+Botão Adicionar ao carrinho (POST real para API)
+
+Estados obrigatórios:
+
+Skeleton loading (enquanto a API responde)
+
+Mensagem de erro (falha do backend)
+
+Estado vazio (API retorna lista vazia)
+3. Filtros e ordenação (baseados na API)
+
+Categorias vindas do backend
+
+Ordenação via query params (se suportado)
+
+Atualização dinâmica sem reload da página
+4. Responsividade
+
+Mobile first
+
+Grid adaptável:
+
+Mobile: 2 colunas
+
+Tablet: 3 colunas
+
+Desktop: 4 colunas
+
+Componentização obrigatória
+
+Criar componentes desacoplados e reutilizáveis:
+
+Header
+
+ProductGrid
+
+ProductCard
+
+FiltersBar
+
+SearchInput
+
+CartButton
+
+Todos recebem dados via props vindas da API, nunca internos.
+
+Qualidade de Código (obrigatório)
+
+Tipagem forte com TypeScript
+
+Componentes pequenos e reutilizáveis
+
+Código limpo e legível
+
+Nenhuma dependência desnecessária
+
+Preparado para crescimento do backend
+
+O sistema tem múltiplos tipos de utilizador, e a UI/rotas devem estar separadas por área, com proteção de acesso baseada no backend.
+
+Exemplo de roles (ajusta aos do backend)
+
+PUBLIC (Visitante): vê catálogo, pesquisa, produto
+
+CUSTOMER (Cliente): carrinho, checkout, pedidos, perfil
+
+SELLER/GERENTE (Gestor/Vendedor): painel para gerir produtos, stock, pedidos
+
+ADMIN: administração total (utilizadores, permissões, auditoria, configurações)
+
+⚠️ A fonte da verdade do role vem do backend
+Restrições finais
+
+🚫 Não usar dados mock
+🚫 Não usar JSON local
+🚫 Não simular API
+🚫 Não criar endpoints fictícios
+
+✅ Apenas consumir o backend real
+✅ Adaptar o frontend à API existente
+✅ Tratar todos os estados reais da aplicação
+
+MPESA_BASE_URL="https://api.vm.co.mz"
+MPESA_BASE_URL="https://api.sandbox.vm.co.mz"
+http://localhost:4000/v1

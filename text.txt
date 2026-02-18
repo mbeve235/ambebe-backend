@@ -1,0 +1,109 @@
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkYzBiMmI3NC05Mzk4LTQ2YWQtODVjMi1mNTdjNWM2MWJiYzgiLCJyb2xlIjoiYWRtaW4iLCJpYXQiOjE3Njg1NzExNDAsImV4cCI6MTc2ODU3MjA0MH0.ozuYuPvf1LaES_eptBBVmm03o1_PAukx7qSAS2hQVSM
+
+
+npx tsx src/tests/mail.test.ts
+
+oque cada um destes faz
+*   *Framework*: Next.js
+*   *Linguagem*: TypeScript
+*   *Banco de Dados*: SQLite (usando Prisma)
+*   *Estilização*: Tailwind CSS
+*   *UI*: Radix UI, shadcn-ui
+*   *Comunicação com API*: Axios
+*   *Validação de Esquema*: Zod
+
+adicione o seguinte, mudar de noturno para diurno, minha empresa tem logo e marca.
+ empresa: AMBEBE CORP
+ marca : AMBEBE como 
+
+ adicione o seguinte, mudar de noturno para diurno, minha empresa tem logo e marca.
+ empresa: AMBEBE CORP
+ marca : AMBEBE como 
+
+| Uso      | Cor          | Hex       |
+| -------- | ------------ | --------- |
+| Fundo    | Cinza Claro  | `#F8FAFC` |
+| Primária | Azul Tech    | `#2563EB` |
+| Destaque | Verde        | `#22C55E` |
+| Texto    | Cinza Escuro | `#334155` |
+
+nokia ta 11-65
+65uwip ndyt mltt nxij
+staff-login
+
+
+crie todos as telas do staff
+
+QUERO UMA IMAGEM DE UMA IMAGEM DE UMA FIGURA DO TIPO ICON QUE NO SEU LADO ESQUERDO DE UM SETA DE TENDENCIA PARA CIMA ELE A FIGURA NO MEIO DO SEU LADO DIREITO UM LIVRO E ENCIMA DA CABECA DO ICON UMA IGRENAGEM.
+
+Claro 👍
+Vou **reformular o teu prompt** para um **nível PROFISSIONAL**, próprio para gerar **logotipo / ícone corporativo moderno**, pronto para **branding, app e e-commerce**.
+
+Abaixo vai o **PROMPT MELHORADO**, bem estruturado, claro e técnico.
+
+---
+
+## ✅ PROMPT PROFISSIONAL (VERSÃO FINAL)
+
+> **Crie um ícone moderno, minimalista e profissional para uma marca de tecnologia e conhecimento.**
+>
+> O ícone deve representar uma **figura abstrata (não humana realista)**, com estilo **flat / vector**, linhas limpas e design equilibrado.
+>
+> **Composição do ícone:**
+>
+> * No **lado esquerdo da figura**, uma **seta de tendência apontando para cima**, simbolizando crescimento, progresso e evolução.
+> * **No centro**, a figura principal do ícone, abstrata e geométrica, representando uma pessoa inteligente e moderna (sem rosto detalhado).
+> * No **lado direito da figura**, um **livro estilizado**, simbolizando conhecimento, aprendizado e educação.
+> * **Acima da cabeça da figura**, uma **engrenagem moderna**, representando inteligência, estratégia, tecnologia e pensamento lógico.
+>
+> **Estilo visual:**
+>
+> * Corporativo moderno
+> * Minimalista e elegante
+> * Sem excesso de detalhes
+> * Aparência profissional e confiável
+>
+> **Cores:**
+>
+> * Azul tecnológico (#2563EB) como cor principal
+> * Verde (#22C55E) como detalhe opcional
+> * Fundo claro ou transparente
+>
+> **Requisitos técnicos:**
+>
+> * Excelente leitura em tamanhos pequenos
+> * Ícone adequado para logotipo, aplicativo, site e materiais digitais
+> * Estilo limpo, memorável e escalável
+> * Não usar texto, apenas o símbolo
+>
+> **Sensação transmitida:**
+> Inteligência, crescimento, inovação, conhecimento e modernidade.
+
+---
+
+## 🔥 VERSÃO MAIS CURTA (se a IA preferir prompts diretos)
+
+> Ícone vetorial minimalista e profissional: figura abstrata moderna no centro, seta de crescimento apontando para cima à esquerda, livro estilizado à direita e engrenagem acima da cabeça. Estilo corporativo moderno, flat design, linhas limpas, cores azul tecnológico e verde, fundo claro ou transparente. Sem texto.
+
+---
+
+## 🎯 DICA DE OURO (branding)
+
+Se esse ícone for para **marca jovem + profissional**, esse conjunto:
+
+* **Seta ↑** → crescimento
+* **Livro** → conhecimento
+* **Engrenagem** → inteligência / tecnologia
+
+é **muito forte** e coerente.
+
+---
+
+Se quiser, no próximo passo posso:
+
+* adaptar esse prompt para **DALL·E / Midjourney / Leonardo AI**
+* ajustar para **logotipo da TLARA / SMARTA / XINTA**
+* simplificar ainda mais para **ícone de app**
+
+É só dizer 👌
+
