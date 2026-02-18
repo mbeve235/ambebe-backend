@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { ApiError } from "../utils/apiError.js";
 
 type DbClient = PrismaClient | Prisma.TransactionClient;

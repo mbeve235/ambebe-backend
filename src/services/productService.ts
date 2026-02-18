@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { ApiError } from "../utils/apiError.js";
 
 export async function createProduct(input: {
@@ -27,7 +28,7 @@ export async function createProduct(input: {
           sku: variant.sku,
           name: variant.name,
           price: variant.price,
-          attributes: variant.attributes,
+          attributes: variant.attributes as Prisma.InputJsonValue,
           stockItem: { create: { onHand: 0 } }
         }))
       }

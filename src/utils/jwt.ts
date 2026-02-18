@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import type { SignOptions } from "jsonwebtoken";
 import { env } from "../config/env.js";
 
 export type JwtPayload = {
@@ -7,11 +8,13 @@ export type JwtPayload = {
 };
 
 export function signAccessToken(payload: JwtPayload) {
-  return jwt.sign(payload, env.jwtAccessSecret, { expiresIn: env.jwtAccessTtl });
+  const expiresIn = env.jwtAccessTtl as SignOptions["expiresIn"];
+  return jwt.sign(payload, env.jwtAccessSecret, { expiresIn });
 }
 
 export function signRefreshToken(payload: JwtPayload) {
-  return jwt.sign(payload, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshTtl });
+  const expiresIn = env.jwtRefreshTtl as SignOptions["expiresIn"];
+  return jwt.sign(payload, env.jwtRefreshSecret, { expiresIn });
 }
 
 export function verifyAccessToken(token: string) {

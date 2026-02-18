@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { ApiError } from "../utils/apiError.js";
 
 export async function getOrCreateCart(userId: string) {
@@ -27,7 +28,7 @@ export async function addCartItem(userId: string, input: { productId: string; va
   const priceSnapshot = variant ? variant.price : product.basePrice;
   const nameSnapshot = variant ? variant.name : product.name;
   const skuSnapshot = variant ? variant.sku : product.slug;
-  const attributesSnapshot = variant ? variant.attributes : {};
+  const attributesSnapshot = (variant ? variant.attributes : {}) as Prisma.InputJsonValue | Prisma.JsonNullValueInput;
 
   const item = await prisma.cartItem.create({
     data: {

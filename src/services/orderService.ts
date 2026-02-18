@@ -1,6 +1,11 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { normalizeCouponCode, resolveCoupon } from "./couponService.js";
+
+export type CheckoutOrder = Prisma.OrderGetPayload<{
+  include: { items: true; payment: true };
+}>;
 
 export async function getCheckoutSummary(userId: string, couponCode?: string | null) {
   const cart = await prisma.cart.findUnique({
@@ -31,7 +36,11 @@ export async function getCheckoutSummary(userId: string, couponCode?: string | n
   };
 }
 
-export async function checkoutCart(userId: string, couponCode?: string | null, paymentProvider?: string | null) {
+export async function checkoutCart(
+  userId: string,
+  couponCode?: string | null,
+  paymentProvider?: string | null
+): Promise<CheckoutOrder> {
   const cart = await prisma.cart.findUnique({
     where: { userId },
     include: { items: true }
@@ -78,7 +87,7 @@ export async function checkoutCart(userId: string, couponCode?: string | null, p
             priceSnapshot: item.priceSnapshot,
             nameSnapshot: item.nameSnapshot,
             skuSnapshot: item.skuSnapshot,
-            attributesSnapshot: item.attributesSnapshot
+            attributesSnapshot: (item.attributesSnapshot ?? Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.JsonNullValueInput
           }))
         },
         payment: {

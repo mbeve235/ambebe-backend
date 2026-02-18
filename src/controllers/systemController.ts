@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { logger } from "../config/logger.js";
@@ -82,7 +83,7 @@ export async function stripeWebhook(req: Request, res: Response, next: NextFunct
             action: "stripe_webhook",
             entity: "system",
             entityId: meta.paymentId ? String(meta.paymentId) : meta.orderId ? String(meta.orderId) : null,
-            meta
+            meta: meta as Prisma.InputJsonValue
           }
         });
       } catch (err) {
@@ -114,10 +115,10 @@ export async function stripeWebhook(req: Request, res: Response, next: NextFunct
       }
 
       if (session.payment_status === "paid") {
-        let resolvedOrderId = orderId;
+        let resolvedOrderId: string | undefined = orderId ?? undefined;
         if (!resolvedOrderId && paymentId) {
           const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
-          resolvedOrderId = payment?.orderId ?? null;
+          resolvedOrderId = payment?.orderId ?? undefined;
         }
 
         if (paymentId) {

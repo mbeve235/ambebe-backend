@@ -1,9 +1,10 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 
 type OrderItemLike = {
   productId?: string | null;
   nameSnapshot: string;
-  priceSnapshot: number | string;
+  priceSnapshot: number | string | Prisma.Decimal;
   quantity: number;
 };
 

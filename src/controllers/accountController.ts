@@ -432,7 +432,7 @@ export async function checkout(req: Request, res: Response, next: NextFunction) 
     const order = await checkoutCart(req.user.id, req.body.couponCode, req.body.paymentProvider);
     const userSummary = { id: req.user.id, email: req.user.email, name: req.user.name };
 
-    let paymentWithExtras = order.payment;
+    let paymentWithExtras: (typeof order.payment & { checkoutUrl?: string | null }) | null = order.payment;
     if (req.body.paymentProvider === "STRIPE" && order.payment) {
       const lineItems = await buildStripeLineItems(order.items ?? [], getAssetBaseUrl(req));
       const session = await createStripeCheckoutSession({

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { ProductStatus } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { logger } from "../config/logger.js";
@@ -374,7 +375,7 @@ async function undoAuditAction(log: { meta: unknown; entityId: string | null }) 
     if (method === "DELETE") {
       await prisma.product.update({
         where: { id: productPrev.id as string },
-        data: { status: (productPrev.status as string) ?? "ACTIVE" }
+        data: { status: (productPrev.status as ProductStatus) ?? ProductStatus.ACTIVE }
       });
       return { action: "restore_product_status", entityId: productPrev.id as string };
     }

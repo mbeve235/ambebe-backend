@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 import { sha256 } from "../utils/hash.js";
 
 export async function getIdempotentResponse(userId: string, key: string, body: unknown) {
@@ -24,7 +25,7 @@ export async function storeIdempotentResponse(userId: string, key: string, reque
       key,
       userId,
       requestHash,
-      responseBody,
+      responseBody: (responseBody ?? Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.JsonNullValueInput,
       expiresAt
     }
   });

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
@@ -87,7 +88,7 @@ export async function listProducts(req: Request, res: Response, next: NextFuncti
       if (maxPrice !== undefined) where.basePrice.lte = maxPrice;
     }
 
-    const orderBy =
+    const orderBy: Prisma.ProductOrderByWithRelationInput =
       sort === "price_asc"
         ? { basePrice: "asc" }
         : sort === "price_desc"

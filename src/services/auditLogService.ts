@@ -1,4 +1,5 @@
 import { prisma } from "../config/prisma.js";
+import { Prisma } from "@prisma/client";
 
 export async function writeAuditLog(actorId: string | null, action: string, entity: string, entityId: string | null, meta: Record<string, unknown>) {
   await prisma.auditLog.create({
@@ -7,7 +8,7 @@ export async function writeAuditLog(actorId: string | null, action: string, enti
       action,
       entity,
       entityId,
-      meta
+      meta: meta as Prisma.InputJsonValue
     }
   });
 }
