@@ -14,7 +14,7 @@ function requireEnv(key: string, fallback?: string) {
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(currentDir, "..", "..");
-const rawUploadDir = process.env.UPLOAD_DIR || "./uploads";
+const rawUploadDir = process.env.UPLOAD_DIR || (process.env.VERCEL ? "/tmp/uploads" : "./uploads");
 const uploadDir = path.isAbsolute(rawUploadDir) ? rawUploadDir : path.resolve(appRoot, rawUploadDir);
 
 export const env = {
