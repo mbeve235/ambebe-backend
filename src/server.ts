@@ -1,9 +1,12 @@
 import { app } from "./app.js";
 import { env } from "./config/env.js";
+import { connectDatabase } from "./config/prisma.js";
 import { connectRedis } from "./config/redis.js";
 import { logger } from "./config/logger.js";
 
 async function start() {
+  await connectDatabase();
+
   try {
     await connectRedis();
   } catch (err) {

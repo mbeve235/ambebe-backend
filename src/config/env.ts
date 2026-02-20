@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import mysql from "mysql2/promise";
 
 dotenv.config();
 
@@ -16,6 +17,9 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(currentDir, "..", "..");
 const rawUploadDir = process.env.UPLOAD_DIR || (process.env.VERCEL ? "/tmp/uploads" : "./uploads");
 const uploadDir = path.isAbsolute(rawUploadDir) ? rawUploadDir : path.resolve(appRoot, rawUploadDir);
+
+
+
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || "development",
