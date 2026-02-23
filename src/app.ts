@@ -47,7 +47,9 @@ app.use(
   express.static(path.resolve(env.uploadDir))
 );
 
-app.use("/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use("/docs", swaggerUi.serve);
+app.get("/docs", swaggerUi.setup(swaggerSpec));
+app.get("/docs/", swaggerUi.setup(swaggerSpec));
 
 app.use("/v1", router);
 
