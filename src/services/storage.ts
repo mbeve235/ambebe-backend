@@ -59,7 +59,21 @@ export class S3Storage implements StorageProvider {
       }
     });
     this.bucket = env.s3.bucket;
-    this.publicBaseUrl = env.s3.publicBaseUrl.replace(/\/+$/, "");
+    this.publicBaseUrl = this.resolvePublicBaseUrl(env.s3.publicBaseUrl, env.s3.endpoint);
+  }
+
+  private resolvePublicBaseUrl(publicBaseUrl: string, endpoint: string): string {
+    const explicit = publicBaseUrl.trim().replace(/\/+$/, "");
+    if (explicit) {
+      return explicit;
+    }
+
+    const normalizedEndpoint = endpoint.trim().replace(/\/+$/, "");
+    if (normalizedEndpoint.includes("/storage/v1/s3")) {
+      return normalizedEndpoint.replace(/\/storage\/v1\/s3$/, "/storage/v1/object/public");
+    }
+
+    return "";
   }
 
   async save(input: StorageSaveInput): Promise<StorageSaveResult> {

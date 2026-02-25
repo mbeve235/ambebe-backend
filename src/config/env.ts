@@ -4,8 +4,13 @@ import { fileURLToPath } from "url";
 
 dotenv.config();
 
+function normalizeEnv(value?: string) {
+  if (!value) return "";
+  return value.trim().replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
+}
+
 function requireEnv(key: string, fallback?: string) {
-  const value = process.env[key] ?? fallback;
+  const value = normalizeEnv(process.env[key] ?? fallback);
   if (!value) {
     throw new Error(`Missing env: ${key}`);
   }
@@ -14,7 +19,7 @@ function requireEnv(key: string, fallback?: string) {
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const appRoot = path.resolve(currentDir, "..", "..");
-const rawUploadDir = process.env.UPLOAD_DIR || (process.env.VERCEL ? "/tmp/uploads" : "./uploads");
+const rawUploadDir = normalizeEnv(process.env.UPLOAD_DIR) || (process.env.VERCEL ? "/tmp/uploads" : "./uploads");
 const uploadDir = path.isAbsolute(rawUploadDir) ? rawUploadDir : path.resolve(appRoot, rawUploadDir);
 const parseBool = (value?: string) => (value || "").toLowerCase() === "true";
 
@@ -35,15 +40,15 @@ export const env = {
     .filter(Boolean),
   uploadDir,
   appBaseUrl: process.env.APP_BASE_URL || "http://127.0.0.1:3000",
-  storageProvider: process.env.STORAGE_PROVIDER || "local",
+  storageProvider: normalizeEnv(process.env.STORAGE_PROVIDER) || "local",
   s3: {
-    region: process.env.S3_REGION || "",
-    bucket: process.env.S3_BUCKET || "",
-    accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
-    endpoint: process.env.S3_ENDPOINT || "",
-    publicBaseUrl: process.env.S3_PUBLIC_BASE_URL || "",
-    forcePathStyle: parseBool(process.env.S3_FORCE_PATH_STYLE)
+    region: normalizeEnv(process.env.S3_REGION),
+    bucket: normalizeEnv(process.env.S3_BUCKET),
+    accessKeyId: normalizeEnv(process.env.S3_ACCESS_KEY_ID),
+    secretAccessKey: normalizeEnv(process.env.S3_SECRET_ACCESS_KEY),
+    endpoint: normalizeEnv(process.env.S3_ENDPOINT),
+    publicBaseUrl: normalizeEnv(process.env.S3_PUBLIC_BASE_URL),
+    forcePathStyle: parseBool(normalizeEnv(process.env.S3_FORCE_PATH_STYLE))
   },
   redisUrl: process.env.REDIS_URL || "",
   rateLimit: {
