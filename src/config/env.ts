@@ -1,7 +1,6 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import mysql from "mysql2/promise";
 
 dotenv.config();
 

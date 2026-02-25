@@ -1,16 +1,16 @@
 version: "3.9"
 services:
-  mariadb:
-    image: mariadb:11
-    container_name: ecommerce-mariadb
-    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+  postgres:
+    image: postgres:16
+    container_name: ecommerce-postgres
     environment:
-      MARIADB_ROOT_PASSWORD: root
-      MARIADB_DATABASE: ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ecommerce
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
   redis:
     image: redis:7
     container_name: ecommerce-redis
@@ -19,5 +19,5 @@ services:
     volumes:
       - redis_data:/data
 volumes:
-  mariadb_data:
+  postgres_data:
   redis_data:

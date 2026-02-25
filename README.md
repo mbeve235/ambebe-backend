@@ -1,6 +1,6 @@
 # E-commerce API
 
-Plataforma de e-commerce robusta e modular desenvolvida com **Node.js**, **TypeScript**, **Express**, **Prisma** e **MariaDB**. API REST completa com autenticação, controle de acesso, gestão de produtos, pedidos, cupons, pagamentos e suporte ao cliente.
+Plataforma de e-commerce robusta e modular desenvolvida com **Node.js**, **TypeScript**, **Express**, **Prisma** e **PostgreSQL**. API REST completa com autenticação, controle de acesso, gestão de produtos, pedidos, cupons, pagamentos e suporte ao cliente.
 
 ## 📋 Sumário
 
@@ -34,8 +34,8 @@ Plataforma de e-commerce robusta e modular desenvolvida com **Node.js**, **TypeS
 
 - **Node.js** 18.0+
 - **npm** 9.0+ ou **yarn**
-- **Docker** (para MariaDB e Redis)
-- **MariaDB** 10.6+ (ou MySQL 8.0+)
+- **Docker** (para PostgreSQL e Redis)
+- **PostgreSQL** 14+
 - **Redis** 6.0+ (opcional, para cache)
 
 ## 🚀 Instalação
@@ -51,7 +51,7 @@ cd backend
 npm install
 ```
 
-### 3. Suba os serviços (MariaDB + Redis)
+### 3. Suba os serviços (PostgreSQL + Redis)
 ```bash
 docker-compose up -d
 ```
@@ -63,7 +63,7 @@ cp .env.example .env
 
 Edite o arquivo `.env` com suas credenciais:
 ```env
-DATABASE_URL="mysql://user:password@localhost:3306/ecommerce"
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/ecommerce?schema=public"
 REDIS_URL="redis://localhost:6379"
 JWT_SECRET="seu_secret_jwt_aqui"
 NODE_ENV="development"
@@ -225,7 +225,7 @@ backend/
 │   ├── seed.ts             # Seed de dados
 │   └── migrations/         # Migrações do banco
 ├── uploads/                # Storage local de arquivos
-├── docker-compose.yml      # Serviços (MariaDB, Redis)
++-- docker-compose.yml      # Servi�os (PostgreSQL, Redis)
 ├── .env.example            # Template de variáveis
 ├── package.json
 ├── tsconfig.json
@@ -238,7 +238,7 @@ backend/
 - **Express** - Framework web
 - **TypeScript** - Tipagem estática
 - **Prisma** - ORM moderno
-- **MariaDB/MySQL** - Banco de dados
+- **PostgreSQL** - Banco de dados
 - **Redis** - Cache e sessões
 - **JWT** - Autenticação
 - **Stripe** - Pagamentos
@@ -285,3 +285,7 @@ Para dúvidas ou problemas, abra uma [issue](../../issues) ou entre em contato a
 - `MPESA_PURCHASE_DESC` define a descricao enviada em `input_PurchasedItemsDesc`.
 - `MPESA_SESSION_DELAY_MS` permite aguardar alguns segundos antes do C2B (a sessao pode demorar para ficar ativa).
 - `MPESA_ORIGIN` e opcional. `MPESA_TIMEOUT_MS` define o timeout da chamada.
+
+
+
+

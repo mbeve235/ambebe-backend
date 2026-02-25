@@ -1,4 +1,4 @@
-// Prisma schema for MariaDB/MySQL
+// Prisma schema for PostgreSQL
 
 
 generator client {
@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
