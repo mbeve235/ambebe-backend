@@ -1,0 +1,1 @@
+-- Legacy MySQL migration replaced during PostgreSQL migration.
