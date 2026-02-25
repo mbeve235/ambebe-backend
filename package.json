@@ -1,5 +1,5 @@
 {
-  "name": "jovemgo-backend",
+  "name": "ambebe-backend",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "build": "prisma generate && tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "start:prod": "npm run migrate:deploy && npm run start",
-    "vercel-build": "npm run migrate:deploy && npm run build",
+    "vercel-build": "npm run build",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",

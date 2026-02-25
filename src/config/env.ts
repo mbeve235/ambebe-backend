@@ -23,7 +23,7 @@ const uploadDir = path.isAbsolute(rawUploadDir) ? rawUploadDir : path.resolve(ap
 export const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 4000),
-  databaseUrl: requireEnv("DATABASE_URL"),
+  databaseUrl: requireEnv("DATABASE_URL", process.env.POSTGRES_URL),
   jwtAccessSecret: requireEnv("JWT_ACCESS_SECRET"),
   jwtRefreshSecret: requireEnv("JWT_REFRESH_SECRET"),
   jwtAccessTtl: process.env.JWT_ACCESS_TTL || "15m",
@@ -55,3 +55,4 @@ export const env = {
   },
   supportEmail: process.env.SUPPORT_EMAIL || process.env.MAIL_FROM || ""
 };
+
