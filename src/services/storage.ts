@@ -43,6 +43,7 @@ export class LocalStorage implements StorageProvider {
 export class S3Storage implements StorageProvider {
   private client: S3Client;
   private bucket: string;
+  private publicBaseUrl: string;
 
   constructor() {
     if (!env.s3.bucket || !env.s3.region) {
@@ -50,12 +51,15 @@ export class S3Storage implements StorageProvider {
     }
     this.client = new S3Client({
       region: env.s3.region,
+      endpoint: env.s3.endpoint || undefined,
+      forcePathStyle: env.s3.forcePathStyle,
       credentials: {
         accessKeyId: env.s3.accessKeyId,
         secretAccessKey: env.s3.secretAccessKey
       }
     });
     this.bucket = env.s3.bucket;
+    this.publicBaseUrl = env.s3.publicBaseUrl.replace(/\/+$/, "");
   }
 
   async save(input: StorageSaveInput): Promise<StorageSaveResult> {
@@ -68,7 +72,10 @@ export class S3Storage implements StorageProvider {
         ContentType: input.mimeType
       })
     );
-    return { url: `https://${this.bucket}.s3.amazonaws.com/${key}`, key };
+    const url = this.publicBaseUrl
+      ? `${this.publicBaseUrl}/${this.bucket}/${key}`
+      : `https://${this.bucket}.s3.amazonaws.com/${key}`;
+    return { url, key };
   }
 
   async remove(key: string): Promise<void> {
