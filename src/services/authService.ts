@@ -8,6 +8,7 @@ import { sendEmailVerificationEmail, sendLoginAttemptAlert, sendPasswordResetEma
 
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 2 * 60 * 1000;
+const PASSWORD_RESET_LINK_TTL_MS = 10 * 60 * 1000;
 const PASSWORD_RESET_DAILY_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_REQUEST_BACKOFF_MS = [
   2 * 60 * 1000,
@@ -79,7 +80,13 @@ export async function registerUser(email: string, password: string, name?: strin
 
   const verification = await createEmailVerificationToken(user.id);
   try {
-    await sendEmailVerificationEmail(user.email, verification.token, verification.code);
+    await sendEmailVerificationEmail(
+      user.email,
+      verification.token,
+      verification.code,
+      user.name,
+      "24 horas"
+    );
   } catch (error) {
     await prisma.emailVerificationToken.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
@@ -326,11 +333,11 @@ export async function requestPasswordReset(email: string) {
     data: {
       userId: user.id,
       tokenHash,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000)
+      expiresAt: new Date(Date.now() + PASSWORD_RESET_LINK_TTL_MS)
     }
   });
 
-  await sendPasswordResetEmail(user.email, rawToken);
+  await sendPasswordResetEmail(user.email, rawToken, user.name, "10 minutos");
   return null;
 }
 
