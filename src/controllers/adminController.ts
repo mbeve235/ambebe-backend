@@ -91,11 +91,64 @@ export async function getUser(req: Request, res: Response, next: NextFunction) {
 
 export async function deleteUser(req: Request, res: Response, next: NextFunction) {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.params.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, email: true }
+    });
     if (!user) {
       throw new ApiError(404, "not_found", "User not found");
     }
-    await prisma.user.delete({ where: { id: req.params.id } });
+
+    await prisma.$transaction(async (tx) => {
+      const orders = await tx.order.findMany({
+        where: { userId: user.id },
+        select: { id: true }
+      });
+      const orderIds = orders.map((order) => order.id);
+
+      const supportMessages = await tx.supportMessage.findMany({
+        where: { userId: user.id },
+        select: { id: true }
+      });
+      const supportMessageIds = supportMessages.map((message) => message.id);
+
+      await tx.passwordResetToken.deleteMany({ where: { userId: user.id } });
+      await tx.emailVerificationToken.deleteMany({ where: { userId: user.id } });
+      await tx.refreshToken.deleteMany({ where: { userId: user.id } });
+      await tx.notificationPreference.deleteMany({ where: { userId: user.id } });
+      await tx.address.deleteMany({ where: { userId: user.id } });
+      await tx.idempotencyKey.deleteMany({ where: { userId: user.id } });
+      await tx.loginAttempt.deleteMany({ where: { email: user.email } });
+
+      await tx.supportReply.deleteMany({ where: { authorId: user.id } });
+      if (supportMessageIds.length) {
+        await tx.supportReply.deleteMany({ where: { supportMessageId: { in: supportMessageIds } } });
+        await tx.supportMessage.deleteMany({ where: { id: { in: supportMessageIds } } });
+      }
+
+      const cart = await tx.cart.findUnique({
+        where: { userId: user.id },
+        select: { id: true }
+      });
+      if (cart) {
+        await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+        await tx.cart.delete({ where: { id: cart.id } });
+      }
+
+      if (orderIds.length) {
+        await tx.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+        await tx.order.deleteMany({ where: { id: { in: orderIds } } });
+      }
+
+      await tx.auditLog.updateMany({
+        where: { actorId: user.id },
+        data: { actorId: null }
+      });
+
+      await tx.user.delete({ where: { id: user.id } });
+    });
+
     res.status(204).send();
   } catch (err) {
     next(err);
