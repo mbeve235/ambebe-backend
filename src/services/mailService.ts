@@ -1,11 +1,13 @@
 import nodemailer from "nodemailer";
 import { env } from "../config/env.js";
+import { prisma } from "../config/prisma.js";
 
-const DEFAULT_BRAND_NAME = "{{NOME_DA_MARCA}}";
+const DEFAULT_BRAND_NAME = "AMBEBE CORP";
 const DEFAULT_LOGO_URL = "{{LOGO_URL}}";
 const DEFAULT_CUSTOMER_NAME = "{{NOME_DO_CLIENTE}}";
 const DEFAULT_SUPPORT_EMAIL = "{{EMAIL_SUPORTE}}";
 const DEFAULT_EXPIRATION = "{{TEMPO_DE_EXPIRACAO}}";
+const DEFAULT_RESET_LINK = "{{LINK_REDEFINICAO}}";
 
 type BrandEmailContext = {
   brandName: string;
@@ -56,14 +58,66 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#39;");
 }
 
-function resolveBrandContext(): BrandEmailContext {
+function isAbsoluteUrl(value: string) {
+  return /^https?:\/\//i.test(value);
+}
+
+function trimTrailingSlash(value: string) {
+  return value.replace(/\/+$/, "");
+}
+
+function resolveAssetBaseUrl() {
+  const explicitBase =
+    (process.env.MAIL_ASSET_BASE_URL || "").trim() ||
+    (process.env.PUBLIC_API_BASE_URL || "").trim() ||
+    (process.env.API_BASE_URL || "").trim() ||
+    (process.env.BACKEND_PUBLIC_URL || "").trim();
+
+  if (explicitBase) {
+    return trimTrailingSlash(explicitBase).replace(/\/v1$/i, "");
+  }
+
+  try {
+    const frontendUrl = new URL(env.appBaseUrl);
+    frontendUrl.port = String(env.port);
+    return trimTrailingSlash(frontendUrl.toString());
+  } catch {
+    return trimTrailingSlash(env.appBaseUrl);
+  }
+}
+
+function buildAbsoluteAssetUrl(value: string) {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  if (isAbsoluteUrl(normalized)) return normalized;
+  const base = resolveAssetBaseUrl();
+  const prefix = normalized.startsWith("/") ? "" : "/";
+  return `${base}${prefix}${normalized}`;
+}
+
+async function resolveBrandContext(): Promise<BrandEmailContext> {
   const brandName = (process.env.BRAND_NAME || "").trim() || DEFAULT_BRAND_NAME;
-  const logoUrl = (process.env.MAIL_LOGO_URL || "").trim() || DEFAULT_LOGO_URL;
   const supportEmail = (env.supportEmail || "").trim() || DEFAULT_SUPPORT_EMAIL;
+  const envLogoUrl = (process.env.MAIL_LOGO_URL || "").trim();
+
+  let logoUrl = envLogoUrl;
+  if (!logoUrl) {
+    try {
+      const branding = await prisma.branding.findUnique({
+        where: { key: "default" },
+        select: { logoUrl: true }
+      });
+      logoUrl = (branding?.logoUrl || "").trim();
+    } catch {
+      logoUrl = "";
+    }
+  }
+
+  const resolvedLogoUrl = logoUrl ? buildAbsoluteAssetUrl(logoUrl) : DEFAULT_LOGO_URL;
 
   return {
     brandName,
-    logoUrl,
+    logoUrl: resolvedLogoUrl,
     supportEmail,
     supportUrl: `${env.appBaseUrl}/ajuda`,
     privacyUrl: `${env.appBaseUrl}/politica-de-privacidade`,
@@ -193,14 +247,14 @@ export async function sendPasswordResetEmail(
   expirationLabel?: string
 ) {
   const transporter = getTransporter();
-  const context = resolveBrandContext();
-  const resetUrl = `${env.appBaseUrl}/reset-password?token=${token}`;
+  const context = await resolveBrandContext();
+  const resetUrl = token ? `${env.appBaseUrl}/reset-password?token=${token}` : DEFAULT_RESET_LINK;
   const template = buildTransactionalEmailTemplate(context, {
-    title: "Redefinição de Palavra-passe",
-    preheader: "Recebemos um pedido para redefinir a sua palavra-passe.",
+    title: "Redefinição de Senha",
+    preheader: "Recebemos um pedido para redefinir a sua senha.",
     greetingName: customerName || DEFAULT_CUSTOMER_NAME,
-    intro: "Recebemos um pedido para redefinir a palavra-passe da sua conta.",
-    ctaLabel: "Redefinir Palavra-passe",
+    intro: "Recebemos um pedido para redefinir a senha da sua conta.",
+    ctaLabel: "Redefinir Senha",
     ctaUrl: resetUrl,
     expirationLabel: expirationLabel || DEFAULT_EXPIRATION,
     securityNote: "Por segurança, só utilize este link num dispositivo de confiança.",
@@ -210,7 +264,7 @@ export async function sendPasswordResetEmail(
   await transporter.sendMail({
     from: env.mail.from,
     to: email,
-    subject: "Redefinição de Palavra-passe",
+    subject: "Redefinição de Senha",
     text: template.text,
     html: template.html
   });
@@ -224,7 +278,7 @@ export async function sendEmailVerificationEmail(
   expirationLabel?: string
 ) {
   const transporter = getTransporter();
-  const context = resolveBrandContext();
+  const context = await resolveBrandContext();
   const verifyUrl = `${env.appBaseUrl}/verificar-email?token=${token}`;
   const template = buildTransactionalEmailTemplate(context, {
     title: "Confirmação da Conta",
