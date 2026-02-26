@@ -66,14 +66,14 @@ export const updatePasswordSchema = z.object({
 
 export const addressSchema = z.object({
   body: z.object({
-    name: z.string().min(2).max(120),
-    line1: z.string().min(2),
-    line2: z.string().optional(),
-    city: z.string().min(2),
-    state: z.string().min(2),
-    postalCode: z.string().min(3),
-    country: z.string().length(2),
-    phone: z.string().optional(),
+    name: z.string().trim().min(2).max(120),
+    line1: z.string().trim().min(2),
+    line2: z.string().trim().optional(),
+    city: z.string().trim().min(2),
+    state: z.string().trim().min(2),
+    postalCode: z.string().trim().min(3),
+    country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Country must be 2 letters"),
+    phone: z.string().trim().optional(),
     isDefault: z.boolean().optional()
   })
 });
@@ -81,14 +81,14 @@ export const addressSchema = z.object({
 export const updateAddressSchema = z.object({
   params: z.object({ id: z.string().uuid() }),
   body: z.object({
-    name: z.string().min(2).max(120).optional(),
-    line1: z.string().min(2).optional(),
-    line2: z.string().optional(),
-    city: z.string().min(2).optional(),
-    state: z.string().min(2).optional(),
-    postalCode: z.string().min(3).optional(),
-    country: z.string().length(2).optional(),
-    phone: z.string().optional(),
+    name: z.string().trim().min(2).max(120).optional(),
+    line1: z.string().trim().min(2).optional(),
+    line2: z.string().trim().optional(),
+    city: z.string().trim().min(2).optional(),
+    state: z.string().trim().min(2).optional(),
+    postalCode: z.string().trim().min(3).optional(),
+    country: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, "Country must be 2 letters").optional(),
+    phone: z.string().trim().optional(),
     isDefault: z.boolean().optional()
   })
 });

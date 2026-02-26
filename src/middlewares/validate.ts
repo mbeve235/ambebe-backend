@@ -13,7 +13,12 @@ export function validate(schema: ZodSchema) {
 
     if (!result.success) {
       const details = result.error.flatten();
-      return next(new ApiError(400, "validation_error", "Invalid request", details));
+      const firstFieldError = Object.values(details.fieldErrors).find(
+        (messages) => Array.isArray(messages) && messages.length
+      )?.[0];
+      const formError = details.formErrors?.[0];
+      const message = firstFieldError || formError || "Invalid request";
+      return next(new ApiError(400, "validation_error", message, details));
     }
 
     req.body = result.data.body;
