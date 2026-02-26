@@ -132,8 +132,12 @@ export const verifyEmailSchema = z.object({
 
 export async function verifyEmailHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    await verifyEmail(req.body);
-    res.status(204).send();
+    const result = await verifyEmail(req.body);
+    res.json({
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      user: { id: result.user.id, email: result.user.email, name: result.user.name, role: result.user.role.name }
+    });
   } catch (err) {
     next(err);
   }

@@ -9,6 +9,13 @@ import { sendEmailVerificationEmail, sendLoginAttemptAlert, sendPasswordResetEma
 const EMAIL_VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const EMAIL_VERIFICATION_RESEND_WINDOW_MS = 2 * 60 * 1000;
 const PASSWORD_RESET_DAILY_MS = 24 * 60 * 60 * 1000;
+const PASSWORD_RESET_REQUEST_BACKOFF_MS = [
+  2 * 60 * 1000,
+  10 * 60 * 1000,
+  30 * 60 * 1000,
+  60 * 60 * 1000,
+  24 * 60 * 60 * 1000
+];
 const LOGIN_LOCK_THRESHOLD = 5;
 const LOGIN_LOCK_MS = 2 * 60 * 1000;
 
@@ -120,62 +127,34 @@ export async function loginUser(
     throw new ApiError(403, "email_not_verified", "Confirme seu email para entrar.");
   }
 
-  const payload = { sub: user.id, role: user.role.name };
+  const session = await createSessionForUser(user.id, user.role.name);
+  return { ...session, user };
+}
+
+async function createSessionForUser(userId: string, roleName: string) {
+  const payload = { sub: userId, role: roleName };
   const accessToken = signAccessToken(payload);
   const refreshToken = signRefreshToken(payload);
 
   await prisma.refreshToken.create({
     data: {
-      userId: user.id,
+      userId,
       tokenHash: sha256(refreshToken),
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     }
   });
 
-  return { accessToken, refreshToken, user };
+  return { accessToken, refreshToken };
 }
 
-async function registerFailedLoginAttempt(
-  emailKey: string,
-  user: { email: string; name?: string | null } | null,
-  meta?: { ip?: string; userAgent?: string }
-) {
-  const now = new Date();
-  const existing = await prisma.loginAttempt.findUnique({ where: { email: emailKey } });
-  const nextCount = (existing?.failureCount ?? 0) + 1;
-  const shouldLock = nextCount % LOGIN_LOCK_THRESHOLD === 0;
-  const lockMultiplier = Math.floor(nextCount / LOGIN_LOCK_THRESHOLD);
-  const lockUntil = shouldLock ? new Date(now.getTime() + LOGIN_LOCK_MS * lockMultiplier) : null;
-
-  await prisma.loginAttempt.upsert({
-    where: { email: emailKey },
-    update: {
-      failureCount: nextCount,
-      lockedUntil: lockUntil ?? null,
-      lastFailureAt: now
-    },
-    create: {
-      email: emailKey,
-      failureCount: nextCount,
-      lockedUntil: lockUntil ?? null,
-      lastFailureAt: now
-    }
-  });
-
-  if (shouldLock && user) {
-    try {
-      await sendLoginAttemptAlert({
-        email: user.email,
-        name: user.name,
-        attempts: nextCount,
-        lockMinutes: Math.max(1, Math.round((LOGIN_LOCK_MS * lockMultiplier) / 60000)),
-        ip: meta?.ip,
-        userAgent: meta?.userAgent
-      });
-    } catch {
-      // ignore alert failures
-    }
+function formatWaitTime(ms: number) {
+  const totalMinutes = Math.ceil(ms / 60000);
+  if (totalMinutes < 60) {
+    return `${Math.max(1, totalMinutes)} minuto${totalMinutes === 1 ? "" : "s"}`;
   }
+
+  const hours = Math.ceil(totalMinutes / 60);
+  return `${hours} hora${hours === 1 ? "" : "s"}`;
 }
 
 export async function verifyEmail(params: { token?: string; email?: string; code?: string }) {
@@ -188,7 +167,10 @@ export async function verifyEmail(params: { token?: string; email?: string; code
       throw new ApiError(400, "invalid_verification_token", "Link de verificacao invalido ou expirado");
     }
 
-    const user = await prisma.user.findUnique({ where: { id: record.userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: record.userId },
+      include: { role: true }
+    });
     if (!user) {
       throw new ApiError(404, "not_found", "User not found");
     }
@@ -202,12 +184,16 @@ export async function verifyEmail(params: { token?: string; email?: string; code
       });
     }
 
-    return user;
+    const session = await createSessionForUser(user.id, user.role.name);
+    return { ...session, user };
   }
 
   if (params.email && params.code) {
     const email = params.email.trim();
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { role: true }
+    });
     if (!user) {
       throw new ApiError(400, "invalid_verification_code", "Codigo de verificacao invalido ou expirado");
     }
@@ -229,7 +215,8 @@ export async function verifyEmail(params: { token?: string; email?: string; code
       });
     }
 
-    return user;
+    const session = await createSessionForUser(user.id, user.role.name);
+    return { ...session, user };
   }
 
   throw new ApiError(400, "invalid_request", "Token ou codigo obrigatorio");
@@ -306,11 +293,26 @@ export async function requestPasswordReset(email: string) {
     throw new ApiError(429, "reset_rate_limited", "Voce ja atualizou sua senha nas ultimas 24 horas");
   }
 
-  const recentToken = await prisma.passwordResetToken.findFirst({
-    where: { userId: user.id, createdAt: { gt: oneDayAgo } }
+  const recentRequests = await prisma.passwordResetToken.findMany({
+    where: { userId: user.id, createdAt: { gt: oneDayAgo } },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true }
   });
-  if (recentToken) {
-    throw new ApiError(429, "reset_rate_limited", "Aguarde 24 horas para solicitar um novo link");
+  if (recentRequests.length) {
+    const cooldownMs =
+      PASSWORD_RESET_REQUEST_BACKOFF_MS[
+        Math.min(recentRequests.length - 1, PASSWORD_RESET_REQUEST_BACKOFF_MS.length - 1)
+      ];
+    const lastRequestAt = recentRequests[0].createdAt.getTime();
+    const now = Date.now();
+    const waitMs = lastRequestAt + cooldownMs - now;
+    if (waitMs > 0) {
+      throw new ApiError(
+        429,
+        "reset_rate_limited",
+        `Aguarde ${formatWaitTime(waitMs)} para solicitar um novo link`
+      );
+    }
   }
 
   await prisma.passwordResetToken.updateMany({
@@ -369,4 +371,47 @@ export async function resetPassword(token: string, newPassword: string) {
     where: { userId: record.userId, revokedAt: null },
     data: { revokedAt: new Date() }
   });
+}
+
+async function registerFailedLoginAttempt(
+  emailKey: string,
+  user: { email: string; name?: string | null } | null,
+  meta?: { ip?: string; userAgent?: string }
+) {
+  const now = new Date();
+  const existing = await prisma.loginAttempt.findUnique({ where: { email: emailKey } });
+  const nextCount = (existing?.failureCount ?? 0) + 1;
+  const shouldLock = nextCount % LOGIN_LOCK_THRESHOLD === 0;
+  const lockMultiplier = Math.floor(nextCount / LOGIN_LOCK_THRESHOLD);
+  const lockUntil = shouldLock ? new Date(now.getTime() + LOGIN_LOCK_MS * lockMultiplier) : null;
+
+  await prisma.loginAttempt.upsert({
+    where: { email: emailKey },
+    update: {
+      failureCount: nextCount,
+      lockedUntil: lockUntil ?? null,
+      lastFailureAt: now
+    },
+    create: {
+      email: emailKey,
+      failureCount: nextCount,
+      lockedUntil: lockUntil ?? null,
+      lastFailureAt: now
+    }
+  });
+
+  if (shouldLock && user) {
+    try {
+      await sendLoginAttemptAlert({
+        email: user.email,
+        name: user.name,
+        attempts: nextCount,
+        lockMinutes: Math.max(1, Math.round((LOGIN_LOCK_MS * lockMultiplier) / 60000)),
+        ip: meta?.ip,
+        userAgent: meta?.userAgent
+      });
+    } catch {
+      // ignore alert failures
+    }
+  }
 }
