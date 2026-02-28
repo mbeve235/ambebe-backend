@@ -57,6 +57,7 @@ import {
   listPayments,
   getPayment
 } from "../controllers/staffController.js";
+import { getStaffDashboard, staffDashboardSchema } from "../controllers/staffDashboardController.js";
 
 export const staffRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
@@ -122,3 +123,6 @@ staffRouter.patch(
 // Payments
 staffRouter.get("/payments", permit("order:read"), listPayments);
 staffRouter.get("/payments/:id", permit("order:read"), validate(idParamSchema), getPayment);
+
+// Dashboard analytics
+staffRouter.get("/dashboard", permit("order:read"), validate(staffDashboardSchema), getStaffDashboard);

@@ -4,7 +4,12 @@ import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { logger } from "../config/logger.js";
 import { constructStripeEvent } from "../services/stripeService.js";
-import { ensureOrderStockDeducted, shouldDeductStockForOrderState } from "../services/orderStockService.js";
+import {
+  ensureOrderStockDeducted,
+  ensureOrderStockRestored,
+  shouldDeductStockForOrderState,
+  shouldRestoreStockForOrderCancellation
+} from "../services/orderStockService.js";
 
 export async function health(_req: Request, res: Response) {
   res.json({ status: "ok" });
@@ -50,6 +55,10 @@ export async function paymentWebhook(req: Request, res: Response, next: NextFunc
     }
 
     if (orderId && orderStatus) {
+      const previousOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, status: true, paymentStatus: true }
+      });
       const updatedOrder = await prisma.order.update({
         where: { id: orderId },
         data: {
@@ -59,6 +68,12 @@ export async function paymentWebhook(req: Request, res: Response, next: NextFunc
       });
       if (shouldDeductStockForOrderState(updatedOrder.status, updatedOrder.paymentStatus)) {
         await ensureOrderStockDeducted(updatedOrder.id);
+      }
+      if (
+        previousOrder &&
+        shouldRestoreStockForOrderCancellation(previousOrder.status, previousOrder.paymentStatus, updatedOrder.status)
+      ) {
+        await ensureOrderStockRestored(updatedOrder.id);
       }
     } else if (resolvedOrderId && shouldDeductStockForOrderState(undefined, paymentStatus)) {
       await ensureOrderStockDeducted(resolvedOrderId);

@@ -3,7 +3,12 @@ import { z } from "zod";
 import { createProduct, updateProduct } from "../services/productService.js";
 import { addImageByLink, addImageByUpload, deleteProductImage } from "../services/productImageService.js";
 import { adjustStock } from "../services/stockService.js";
-import { ensureOrderStockDeducted, shouldDeductStockForOrderState } from "../services/orderStockService.js";
+import {
+  ensureOrderStockDeducted,
+  ensureOrderStockRestored,
+  shouldDeductStockForOrderState,
+  shouldRestoreStockForOrderCancellation
+} from "../services/orderStockService.js";
 import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 
@@ -164,12 +169,21 @@ export const updateOrderStatusSchema = z.object({
 
 export async function updateOrderStatus(req: Request, res: Response, next: NextFunction) {
   try {
+    const previousOrder = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, status: true, paymentStatus: true }
+    });
+    if (!previousOrder) throw new ApiError(404, "not_found", "Order not found");
+
     const order = await prisma.order.update({
       where: { id: req.params.id },
       data: { status: req.body.status }
     });
     if (shouldDeductStockForOrderState(order.status, order.paymentStatus)) {
       await ensureOrderStockDeducted(order.id);
+    }
+    if (shouldRestoreStockForOrderCancellation(previousOrder.status, previousOrder.paymentStatus, order.status)) {
+      await ensureOrderStockRestored(order.id);
     }
     res.json(order);
   } catch (err) {
