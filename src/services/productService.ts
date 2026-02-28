@@ -2,6 +2,14 @@ import { prisma } from "../config/prisma.js";
 import { Prisma } from "@prisma/client";
 import { ApiError } from "../utils/apiError.js";
 
+function withCostPrice(attributes: Record<string, unknown> | undefined, costPrice?: number) {
+  const base = attributes ?? {};
+  if (typeof costPrice === "number" && Number.isFinite(costPrice) && costPrice >= 0) {
+    return { ...base, costPrice };
+  }
+  return base;
+}
+
 export async function createProduct(input: {
   name: string;
   slug: string;
@@ -9,7 +17,7 @@ export async function createProduct(input: {
   basePrice: number;
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   categoryIds?: string[];
-  variants: Array<{ sku: string; name: string; price: number; attributes: Record<string, unknown> }>;
+  variants: Array<{ sku: string; name: string; price: number; attributes?: Record<string, unknown>; costPrice?: number }>;
 }) {
   const product = await prisma.product.create({
     data: {
@@ -28,7 +36,7 @@ export async function createProduct(input: {
           sku: variant.sku,
           name: variant.name,
           price: variant.price,
-          attributes: variant.attributes as Prisma.InputJsonValue,
+          attributes: withCostPrice(variant.attributes, variant.costPrice) as Prisma.InputJsonValue,
           stockItem: { create: { onHand: 0 } }
         }))
       }

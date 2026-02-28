@@ -25,7 +25,8 @@ export const createProductSchema = z.object({
         sku: z.string().min(2),
         name: z.string().min(2),
         price: z.number().nonnegative(),
-        attributes: z.record(z.any())
+        costPrice: z.number().nonnegative().optional(),
+        attributes: z.record(z.any()).optional().default({})
       })
     )
   })

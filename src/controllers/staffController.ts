@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
@@ -10,6 +11,14 @@ import {
   shouldDeductStockForOrderState,
   shouldRestoreStockForOrderCancellation
 } from "../services/orderStockService.js";
+
+function buildVariantAttributes(attributes?: Record<string, unknown>, costPrice?: number): Prisma.InputJsonValue {
+  const base = attributes ?? {};
+  if (typeof costPrice === "number" && Number.isFinite(costPrice) && costPrice >= 0) {
+    return { ...base, costPrice } as Prisma.InputJsonValue;
+  }
+  return base as Prisma.InputJsonValue;
+}
 
 export const idParamSchema = z.object({
   params: z.object({ id: z.string().uuid() })
@@ -45,7 +54,8 @@ export const productSchema = z.object({
         sku: z.string().min(2),
         name: z.string().min(2),
         price: z.number().nonnegative(),
-        attributes: z.record(z.any())
+        costPrice: z.number().nonnegative().optional(),
+        attributes: z.record(z.any()).optional().default({})
       })
     )
   })
@@ -87,7 +97,8 @@ export const variantSchema = z.object({
     sku: z.string().min(2),
     name: z.string().min(2),
     price: z.number().nonnegative(),
-    attributes: z.record(z.any())
+    costPrice: z.number().nonnegative().optional(),
+    attributes: z.record(z.any()).optional().default({})
   })
 });
 
@@ -97,7 +108,8 @@ export const updateVariantSchema = z.object({
     sku: z.string().min(2),
     name: z.string().min(2),
     price: z.number().nonnegative(),
-    attributes: z.record(z.any())
+    costPrice: z.number().nonnegative().optional(),
+    attributes: z.record(z.any()).optional().default({})
   })
 });
 
@@ -314,7 +326,7 @@ export async function createVariant(req: Request, res: Response, next: NextFunct
         sku: req.body.sku,
         name: req.body.name,
         price: req.body.price,
-        attributes: req.body.attributes,
+        attributes: buildVariantAttributes(req.body.attributes, req.body.costPrice),
         stockItem: { create: { onHand: 0 } }
       }
     });
@@ -332,7 +344,7 @@ export async function updateVariant(req: Request, res: Response, next: NextFunct
         sku: req.body.sku,
         name: req.body.name,
         price: req.body.price,
-        attributes: req.body.attributes
+        attributes: buildVariantAttributes(req.body.attributes, req.body.costPrice)
       }
     });
     res.json(variant);
