@@ -3,6 +3,40 @@ import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { normalizeCouponCode, resolveCoupon } from "./couponService.js";
 
+function toNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (value && typeof value === "object" && "toNumber" in value && typeof (value as { toNumber?: unknown }).toNumber === "function") {
+    try {
+      const parsed = (value as { toNumber: () => number }).toNumber();
+      return Number.isFinite(parsed) ? parsed : 0;
+    } catch {
+      return 0;
+    }
+  }
+  return 0;
+}
+
+function extractCostFromAttributes(attributes: unknown) {
+  if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) return 0;
+  const source = attributes as Record<string, unknown>;
+  return toNumber(source.costPrice ?? source.cost ?? source.cmv ?? 0);
+}
+
+function normalizeAttributesSnapshot(
+  current: Prisma.JsonValue | null,
+  extras: Record<string, unknown>
+): Prisma.InputJsonValue | Prisma.JsonNullValueInput {
+  const base =
+    current && typeof current === "object" && !Array.isArray(current)
+      ? { ...(current as Record<string, unknown>) }
+      : {};
+  return { ...base, ...extras } as Prisma.InputJsonValue;
+}
+
 export type CheckoutOrder = Prisma.OrderGetPayload<{
   include: { items: true; payment: true };
 }>;
@@ -71,6 +105,20 @@ export async function checkoutCart(
     }
 
     const total = Math.max(0, subtotal - discountTotal);
+    const variantIds = Array.from(
+      new Set(
+        cart.items
+          .map((item) => item.variantId)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+    const variants = variantIds.length
+      ? await tx.productVariant.findMany({
+          where: { id: { in: variantIds } },
+          select: { id: true, attributes: true }
+        })
+      : [];
+    const variantCostMap = new Map(variants.map((variant) => [variant.id, extractCostFromAttributes(variant.attributes)]));
 
     const order = await tx.order.create({
       data: {
@@ -87,7 +135,9 @@ export async function checkoutCart(
             priceSnapshot: item.priceSnapshot,
             nameSnapshot: item.nameSnapshot,
             skuSnapshot: item.skuSnapshot,
-            attributesSnapshot: (item.attributesSnapshot ?? Prisma.JsonNull) as Prisma.InputJsonValue | Prisma.JsonNullValueInput
+            attributesSnapshot: normalizeAttributesSnapshot(item.attributesSnapshot, {
+              costPriceSnapshot: item.variantId ? variantCostMap.get(item.variantId) ?? 0 : 0
+            })
           }))
         },
         payment: {
