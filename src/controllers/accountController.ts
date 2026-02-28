@@ -383,10 +383,7 @@ export async function upsertCartItemByVariant(req: Request, res: Response, next:
       where: { cartId: cart.id, variantId: variant.id }
     });
     if (existing) {
-      const updated = await prisma.cartItem.update({
-        where: { id: existing.id },
-        data: { quantity: req.body.quantity }
-      });
+      const updated = await updateCartItem(req.user.id, existing.id, req.body.quantity);
       return res.json(updated);
     }
     const item = await addCartItem(req.user.id, {

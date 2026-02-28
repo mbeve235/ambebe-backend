@@ -50,9 +50,14 @@ export async function listCategoryProducts(req: Request, res: Response, next: Ne
     const products = await prisma.product.findMany({
       where: {
         status: "ACTIVE",
+        variants: { some: { stockItem: { is: { onHand: { gt: 0 } } } } },
         categories: { some: { categoryId: req.params.id } }
       },
-      include: { images: true, variants: true, categories: { include: { category: true } } }
+      include: {
+        images: true,
+        variants: { where: { stockItem: { is: { onHand: { gt: 0 } } } } },
+        categories: { include: { category: true } }
+      }
     });
     res.json({ items: products });
   } catch (err) {
@@ -72,7 +77,10 @@ export async function listProducts(req: Request, res: Response, next: NextFuncti
       limit?: number;
     };
 
-    const where: any = { status: "ACTIVE" };
+    const where: any = {
+      status: "ACTIVE",
+      variants: { some: { stockItem: { is: { onHand: { gt: 0 } } } } }
+    };
     if (q) {
       where.OR = [
         { name: { contains: q } },
@@ -99,7 +107,11 @@ export async function listProducts(req: Request, res: Response, next: NextFuncti
     const [items, total] = await prisma.$transaction([
       prisma.product.findMany({
         where,
-        include: { images: true, variants: true, categories: { include: { category: true } } },
+        include: {
+          images: true,
+          variants: { where: { stockItem: { is: { onHand: { gt: 0 } } } } },
+          categories: { include: { category: true } }
+        },
         orderBy,
         skip,
         take: limit
@@ -116,8 +128,16 @@ export async function listProducts(req: Request, res: Response, next: NextFuncti
 export async function getProduct(req: Request, res: Response, next: NextFunction) {
   try {
     const product = await prisma.product.findFirst({
-      where: { id: req.params.id, status: "ACTIVE" },
-      include: { images: true, variants: true, categories: { include: { category: true } } }
+      where: {
+        id: req.params.id,
+        status: "ACTIVE",
+        variants: { some: { stockItem: { is: { onHand: { gt: 0 } } } } }
+      },
+      include: {
+        images: true,
+        variants: { where: { stockItem: { is: { onHand: { gt: 0 } } } } },
+        categories: { include: { category: true } }
+      }
     });
     if (!product) {
       throw new ApiError(404, "not_found", "Product not found");
@@ -131,8 +151,16 @@ export async function getProduct(req: Request, res: Response, next: NextFunction
 export async function getProductBySlug(req: Request, res: Response, next: NextFunction) {
   try {
     const product = await prisma.product.findFirst({
-      where: { slug: req.params.slug, status: "ACTIVE" },
-      include: { images: true, variants: true, categories: { include: { category: true } } }
+      where: {
+        slug: req.params.slug,
+        status: "ACTIVE",
+        variants: { some: { stockItem: { is: { onHand: { gt: 0 } } } } }
+      },
+      include: {
+        images: true,
+        variants: { where: { stockItem: { is: { onHand: { gt: 0 } } } } },
+        categories: { include: { category: true } }
+      }
     });
     if (!product) {
       throw new ApiError(404, "not_found", "Product not found");
@@ -146,7 +174,11 @@ export async function getProductBySlug(req: Request, res: Response, next: NextFu
 export async function listProductVariants(req: Request, res: Response, next: NextFunction) {
   try {
     const variants = await prisma.productVariant.findMany({
-      where: { productId: req.params.id }
+      where: {
+        productId: req.params.id,
+        product: { status: "ACTIVE" },
+        stockItem: { is: { onHand: { gt: 0 } } }
+      }
     });
     res.json({ items: variants });
   } catch (err) {
@@ -156,7 +188,13 @@ export async function listProductVariants(req: Request, res: Response, next: Nex
 
 export async function getVariant(req: Request, res: Response, next: NextFunction) {
   try {
-    const variant = await prisma.productVariant.findUnique({ where: { id: req.params.id } });
+    const variant = await prisma.productVariant.findFirst({
+      where: {
+        id: req.params.id,
+        product: { status: "ACTIVE" },
+        stockItem: { is: { onHand: { gt: 0 } } }
+      }
+    });
     if (!variant) {
       throw new ApiError(404, "not_found", "Variant not found");
     }
