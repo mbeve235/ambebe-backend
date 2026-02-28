@@ -4,6 +4,7 @@ import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { logger } from "../config/logger.js";
 import { constructStripeEvent } from "../services/stripeService.js";
+import { ensureOrderStockDeducted, shouldDeductStockForOrderState } from "../services/orderStockService.js";
 
 export async function health(_req: Request, res: Response) {
   res.json({ status: "ok" });
@@ -25,18 +26,20 @@ export async function metrics(_req: Request, res: Response) {
 export async function paymentWebhook(req: Request, res: Response, next: NextFunction) {
   try {
     const { orderId, paymentId, paymentStatus, orderStatus } = req.body || {};
+    let resolvedOrderId: string | null = orderId ?? null;
 
     if (!orderId && !paymentId) {
       throw new ApiError(400, "missing_reference", "orderId or paymentId is required");
     }
 
     if (paymentId) {
-      await prisma.payment.update({
+      const updatedPayment = await prisma.payment.update({
         where: { id: paymentId },
         data: {
           status: paymentStatus
         }
       });
+      resolvedOrderId = resolvedOrderId ?? updatedPayment.orderId;
     } else if (orderId && paymentStatus) {
       await prisma.payment.updateMany({
         where: { orderId },
@@ -47,13 +50,18 @@ export async function paymentWebhook(req: Request, res: Response, next: NextFunc
     }
 
     if (orderId && orderStatus) {
-      await prisma.order.update({
+      const updatedOrder = await prisma.order.update({
         where: { id: orderId },
         data: {
           status: orderStatus,
           paymentStatus: paymentStatus ?? undefined
         }
       });
+      if (shouldDeductStockForOrderState(updatedOrder.status, updatedOrder.paymentStatus)) {
+        await ensureOrderStockDeducted(updatedOrder.id);
+      }
+    } else if (resolvedOrderId && shouldDeductStockForOrderState(undefined, paymentStatus)) {
+      await ensureOrderStockDeducted(resolvedOrderId);
     }
 
     res.json({ status: "ok" });
@@ -134,10 +142,11 @@ export async function stripeWebhook(req: Request, res: Response, next: NextFunct
         }
 
         if (resolvedOrderId) {
-          await prisma.order.update({
+          const updatedOrder = await prisma.order.update({
             where: { id: resolvedOrderId },
             data: { paymentStatus: "CAPTURED", status: "PAID" }
           });
+          await ensureOrderStockDeducted(updatedOrder.id);
         }
 
         await audit({
@@ -208,10 +217,11 @@ export async function stripeWebhook(req: Request, res: Response, next: NextFunct
         }
 
         if (orderId) {
-          await prisma.order.update({
+          const updatedOrder = await prisma.order.update({
             where: { id: orderId },
             data: { paymentStatus: "CAPTURED", status: "PAID" }
           });
+          await ensureOrderStockDeducted(updatedOrder.id);
         }
 
         await audit({

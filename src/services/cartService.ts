@@ -23,6 +23,7 @@ async function resolveCartVariant(productId: string, variantId: string | null | 
       productId,
       stockItem: { is: { onHand: { gte: quantity } } }
     },
+    include: { stockItem: true },
     orderBy: { createdAt: "asc" }
   });
 
@@ -52,6 +53,15 @@ export async function addCartItem(userId: string, input: { productId: string; va
   }
 
   const variant = await resolveCartVariant(product.id, input.variantId, input.quantity);
+  const onHand = variant.stockItem?.onHand ?? 0;
+  const currentVariantQty = await prisma.cartItem.aggregate({
+    where: { cartId: cart.id, variantId: variant.id },
+    _sum: { quantity: true }
+  });
+  const nextQty = (currentVariantQty._sum.quantity ?? 0) + input.quantity;
+  if (nextQty > onHand) {
+    throw new ApiError(400, "out_of_stock", "Quantidade indisponivel em estoque");
+  }
 
   const priceSnapshot = variant.price ?? product.basePrice;
   const nameSnapshot = variant.name ?? product.name;
@@ -87,6 +97,15 @@ export async function updateCartItem(userId: string, itemId: string, quantity: n
   }
 
   const variant = await resolveCartVariant(item.productId, item.variantId, quantity);
+  const onHand = variant.stockItem?.onHand ?? 0;
+  const siblingVariantQty = await prisma.cartItem.aggregate({
+    where: { cartId: cart.id, variantId: variant.id, id: { not: item.id } },
+    _sum: { quantity: true }
+  });
+  const nextQty = (siblingVariantQty._sum.quantity ?? 0) + quantity;
+  if (nextQty > onHand) {
+    throw new ApiError(400, "out_of_stock", "Quantidade indisponivel em estoque");
+  }
 
   return prisma.cartItem.update({
     where: { id: itemId },

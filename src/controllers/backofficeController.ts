@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createProduct, updateProduct } from "../services/productService.js";
 import { addImageByLink, addImageByUpload, deleteProductImage } from "../services/productImageService.js";
 import { adjustStock } from "../services/stockService.js";
+import { ensureOrderStockDeducted, shouldDeductStockForOrderState } from "../services/orderStockService.js";
 import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 
@@ -167,6 +168,9 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       where: { id: req.params.id },
       data: { status: req.body.status }
     });
+    if (shouldDeductStockForOrderState(order.status, order.paymentStatus)) {
+      await ensureOrderStockDeducted(order.id);
+    }
     res.json(order);
   } catch (err) {
     next(err);

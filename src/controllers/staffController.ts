@@ -4,6 +4,7 @@ import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { createProduct, updateProduct } from "../services/productService.js";
 import { addImageByLink, addImageByUpload, deleteProductImage } from "../services/productImageService.js";
+import { ensureOrderStockDeducted, shouldDeductStockForOrderState } from "../services/orderStockService.js";
 
 export const idParamSchema = z.object({
   params: z.object({ id: z.string().uuid() })
@@ -513,6 +514,9 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       where: { id: req.params.id },
       data: { status: req.body.status }
     });
+    if (shouldDeductStockForOrderState(order.status, order.paymentStatus)) {
+      await ensureOrderStockDeducted(order.id);
+    }
     res.json(order);
   } catch (err) {
     next(err);
@@ -529,6 +533,9 @@ export async function updateOrderPaymentStatus(req: Request, res: Response, next
       where: { orderId: order.id },
       data: { status: req.body.paymentStatus }
     });
+    if (shouldDeductStockForOrderState(order.status, order.paymentStatus)) {
+      await ensureOrderStockDeducted(order.id);
+    }
     res.json(order);
   } catch (err) {
     next(err);

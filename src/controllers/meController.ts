@@ -8,6 +8,7 @@ import { checkoutCart } from "../services/orderService.js";
 import { createStripeCheckoutSession } from "../services/stripeService.js";
 import { buildStripeLineItems } from "../services/stripeLineItemService.js";
 import { createMpesaPayment, normalizeMpesaMsisdn } from "../services/mpesaService.js";
+import { ensureOrderStockDeducted } from "../services/orderStockService.js";
 import { writeAuditLog } from "../services/auditLogService.js";
 import { getIdempotentResponse, storeIdempotentResponse } from "../services/idempotencyService.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
@@ -284,6 +285,9 @@ export async function checkout(req: Request, res: Response, next: NextFunction) 
         where: { id: order.id },
         data: { paymentStatus }
       });
+      if (paymentStatus === "AUTHORIZED") {
+        await ensureOrderStockDeducted(order.id);
+      }
       void writeAuditLog(req.user.id, "mpesa_payment", "payment", updatedPayment.id, {
         orderId: order.id,
         paymentId: updatedPayment.id,
