@@ -484,17 +484,31 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
     const paymentStatus = typeof req.query.paymentStatus === "string" ? req.query.paymentStatus : undefined;
     const email = typeof req.query.email === "string" ? req.query.email.trim() : undefined;
+    const orderId = typeof req.query.orderId === "string" ? req.query.orderId.trim() : undefined;
 
     const where: Record<string, unknown> = {};
     if (status) where.status = status;
     if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (orderId) {
+      where.id = { contains: orderId, mode: "insensitive" };
+    }
     if (email) {
-      where.user = { email: { contains: email } };
+      where.user = { email: { contains: email, mode: "insensitive" } };
     }
 
     const items = await prisma.order.findMany({
       where,
-      include: { items: true, payment: true, user: true },
+      include: {
+        items: true,
+        payment: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true
+          }
+        }
+      },
       orderBy: { createdAt: "desc" }
     });
     res.json({ items });
@@ -507,7 +521,36 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
   try {
     const order = await prisma.order.findUnique({
       where: { id: req.params.id },
-      include: { items: true, payment: true, user: true }
+      include: {
+        items: true,
+        payment: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            createdAt: true,
+            addresses: {
+              select: {
+                id: true,
+                userId: true,
+                name: true,
+                line1: true,
+                line2: true,
+                city: true,
+                state: true,
+                postalCode: true,
+                country: true,
+                phone: true,
+                isDefault: true,
+                createdAt: true,
+                updatedAt: true
+              },
+              orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }]
+            }
+          }
+        }
+      }
     });
     if (!order) throw new ApiError(404, "not_found", "Order not found");
     res.json(order);

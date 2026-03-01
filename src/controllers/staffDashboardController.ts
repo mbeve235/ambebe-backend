@@ -98,6 +98,18 @@ function extractCostPriceSnapshot(
   return variantId ? variantCostMap.get(variantId) ?? 0 : 0;
 }
 
+function extractVariantCostPrice(variant: { attributes?: unknown; costPrice?: unknown }) {
+  const direct = toNumber(variant.costPrice);
+  if (direct > 0) return direct;
+  const attrs = variant.attributes;
+  if (attrs && typeof attrs === "object" && !Array.isArray(attrs)) {
+    const source = attrs as Record<string, unknown>;
+    const fromAttrs = toNumber(source.costPrice ?? source.cost ?? source.cmv);
+    if (fromAttrs > 0) return fromAttrs;
+  }
+  return 0;
+}
+
 function getGatewayFeeTotal(provider: string | null | undefined, orderNetRevenue: number) {
   const key = (provider || "").toUpperCase();
   const cfg = gatewayFeeByProvider[key] ?? { fixed: 0, variable: 0.03 };
@@ -172,12 +184,7 @@ export async function getStaffDashboard(req: Request, res: Response, next: NextF
     const variantCostMap = new Map<string, number>();
     for (const product of products) {
       for (const variant of product.variants) {
-        const attrs = variant.attributes;
-        let cost = 0;
-        if (attrs && typeof attrs === "object" && !Array.isArray(attrs)) {
-          const source = attrs as Record<string, unknown>;
-          cost = toNumber(source.costPrice ?? source.cost ?? source.cmv);
-        }
+        const cost = extractVariantCostPrice(variant as unknown as { attributes?: unknown; costPrice?: unknown });
         variantCostMap.set(variant.id, cost);
       }
     }
@@ -371,14 +378,7 @@ export async function getStaffDashboard(req: Request, res: Response, next: NextF
     const highMarginEstimated = products
       .map((product) => {
         const variantCosts = product.variants
-          .map((variant) => {
-            const attrs = variant.attributes;
-            if (attrs && typeof attrs === "object" && !Array.isArray(attrs)) {
-              const source = attrs as Record<string, unknown>;
-              return toNumber(source.costPrice ?? source.cost ?? source.cmv);
-            }
-            return 0;
-          })
+          .map((variant) => extractVariantCostPrice(variant as unknown as { attributes?: unknown; costPrice?: unknown }))
           .filter((cost) => cost > 0);
         const avgCost = variantCosts.length ? variantCosts.reduce((sum, value) => sum + value, 0) / variantCosts.length : 0;
         const grossEstimate = Math.max(0, toNumber(product.basePrice) - avgCost);
@@ -481,9 +481,9 @@ export async function getStaffDashboard(req: Request, res: Response, next: NextF
         recognizedRevenueMonth: revenueMonth,
         receivablesPipeline: pipelinePayments,
         actions: [
-          { id: "stock", label: "Critical stock", count: criticalStock.length, href: "/gestor/estoque", severity: "high" },
-          { id: "delays", label: "Delayed orders", count: delayedOrders.length, href: "/gestor/pedidos?preset=delayed", severity: "high" },
-          { id: "problems", label: "Problem orders", count: problemOrders.length, href: "/gestor/pedidos?preset=problem", severity: "medium" }
+          { id: "stock", label: "Estoque critico", count: criticalStock.length, href: "/gestor/estoque", severity: "high" },
+          { id: "delays", label: "Pedidos atrasados", count: delayedOrders.length, href: "/gestor/pedidos?preset=delayed", severity: "high" },
+          { id: "problems", label: "Pedidos com problema", count: problemOrders.length, href: "/gestor/pedidos?preset=problem", severity: "medium" }
         ]
       },
       salesHealth: {
@@ -562,4 +562,3 @@ export async function getStaffDashboard(req: Request, res: Response, next: NextF
     next(err);
   }
 }
-
