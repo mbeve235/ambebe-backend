@@ -427,7 +427,7 @@ export async function checkout(req: Request, res: Response, next: NextFunction) 
       return res.json(idempotency.responseBody);
     }
 
-    const order = await checkoutCart(req.user.id, req.body.couponCode, req.body.paymentProvider);
+    const order = await checkoutCart(req.user.id, req.body.couponCode, req.body.paymentProvider, req.body.phone ?? null);
     const userSummary = { id: req.user.id, email: req.user.email, name: req.user.name };
 
     let paymentWithExtras: (typeof order.payment & { checkoutUrl?: string | null }) | null = order.payment;

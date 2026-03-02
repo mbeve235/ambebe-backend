@@ -5,6 +5,7 @@ import { prisma } from "../config/prisma.js";
 import { ApiError } from "../utils/apiError.js";
 import { createProduct, updateProduct } from "../services/productService.js";
 import { addImageByLink, addImageByUpload, deleteProductImage } from "../services/productImageService.js";
+import { writeAuditLog } from "../services/auditLogService.js";
 import {
   ensureOrderStockDeducted,
   ensureOrderStockRestored,
@@ -485,33 +486,89 @@ export async function listOrders(req: Request, res: Response, next: NextFunction
     const paymentStatus = typeof req.query.paymentStatus === "string" ? req.query.paymentStatus : undefined;
     const email = typeof req.query.email === "string" ? req.query.email.trim() : undefined;
     const orderId = typeof req.query.orderId === "string" ? req.query.orderId.trim() : undefined;
+    const orderNumber = typeof req.query.orderNumber === "string" ? req.query.orderNumber.trim() : undefined;
+    const name = typeof req.query.name === "string" ? req.query.name.trim() : undefined;
+    const phone = typeof req.query.phone === "string" ? req.query.phone.trim() : undefined;
+    const dateFromRaw = typeof req.query.dateFrom === "string" ? req.query.dateFrom : undefined;
+    const dateToRaw = typeof req.query.dateTo === "string" ? req.query.dateTo : undefined;
+    const minTotalRaw = typeof req.query.minTotal === "string" ? Number(req.query.minTotal) : undefined;
+    const maxTotalRaw = typeof req.query.maxTotal === "string" ? Number(req.query.maxTotal) : undefined;
+    const pageRaw = typeof req.query.page === "string" ? Number(req.query.page) : undefined;
+    const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : undefined;
+    const page = Number.isFinite(pageRaw) && (pageRaw as number) > 0 ? Math.floor(pageRaw as number) : 1;
+    const limit = Number.isFinite(limitRaw) && (limitRaw as number) > 0 ? Math.min(100, Math.floor(limitRaw as number)) : 20;
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-    if (paymentStatus) where.paymentStatus = paymentStatus;
+    const andFilters: Prisma.OrderWhereInput[] = [];
+    if (status) andFilters.push({ status: status as any });
+    if (paymentStatus) andFilters.push({ paymentStatus: paymentStatus as any });
     if (orderId) {
-      where.id = { contains: orderId, mode: "insensitive" };
+      andFilters.push({
+        OR: [
+          { id: { contains: orderId } },
+          { orderNumber: { contains: orderId, mode: "insensitive" } }
+        ]
+      });
     }
-    if (email) {
-      where.user = { email: { contains: email, mode: "insensitive" } };
+    if (orderNumber) andFilters.push({ orderNumber: { contains: orderNumber, mode: "insensitive" } });
+    if (email) andFilters.push({ user: { email: { contains: email, mode: "insensitive" } } });
+    if (name) {
+      andFilters.push({
+        OR: [
+          { customerNameSnapshot: { contains: name, mode: "insensitive" } },
+          { user: { name: { contains: name, mode: "insensitive" } } }
+        ]
+      });
+    }
+    if (phone) {
+      andFilters.push({
+        OR: [
+          { customerPhoneSnapshot: { contains: phone, mode: "insensitive" } },
+          { user: { addresses: { some: { phone: { contains: phone, mode: "insensitive" } } } } }
+        ]
+      });
+    }
+    if (Number.isFinite(minTotalRaw)) andFilters.push({ total: { gte: minTotalRaw as number } });
+    if (Number.isFinite(maxTotalRaw)) andFilters.push({ total: { lte: maxTotalRaw as number } });
+
+    if (dateFromRaw || dateToRaw) {
+      const createdAt: Prisma.DateTimeFilter = {};
+      if (dateFromRaw) {
+        const dateFrom = new Date(dateFromRaw);
+        if (!Number.isNaN(dateFrom.getTime())) createdAt.gte = dateFrom;
+      }
+      if (dateToRaw) {
+        const dateTo = new Date(dateToRaw);
+        if (!Number.isNaN(dateTo.getTime())) {
+          dateTo.setDate(dateTo.getDate() + 1);
+          createdAt.lt = dateTo;
+        }
+      }
+      if (createdAt.gte || createdAt.lt) andFilters.push({ createdAt });
     }
 
-    const items = await prisma.order.findMany({
-      where,
-      include: {
-        items: true,
-        payment: true,
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true
+    const where: Prisma.OrderWhereInput = andFilters.length ? { AND: andFilters } : {};
+
+    const [items, total] = await prisma.$transaction([
+      prisma.order.findMany({
+        where,
+        include: {
+          items: true,
+          payment: true,
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true
+            }
           }
-        }
-      },
-      orderBy: { createdAt: "desc" }
-    });
-    res.json({ items });
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.order.count({ where })
+    ]);
+    res.json({ items, page, limit, total });
   } catch (err) {
     next(err);
   }
@@ -553,7 +610,42 @@ export async function getOrder(req: Request, res: Response, next: NextFunction) 
       }
     });
     if (!order) throw new ApiError(404, "not_found", "Order not found");
-    res.json(order);
+
+    const historyRaw = await prisma.auditLog.findMany({
+      where: {
+        entity: "order",
+        entityId: order.id,
+        action: { in: ["order.status_changed", "order.payment_status_changed"] }
+      },
+      include: {
+        actor: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    });
+
+    const statusHistory = historyRaw.map((log) => {
+      const meta =
+        log.meta && typeof log.meta === "object" && !Array.isArray(log.meta)
+          ? (log.meta as Record<string, unknown>)
+          : {};
+      return {
+        id: log.id,
+        type: log.action,
+        from: typeof meta.from === "string" ? meta.from : null,
+        to: typeof meta.to === "string" ? meta.to : null,
+        createdAt: log.createdAt,
+        actor: log.actor ?? null
+      };
+    });
+
+    res.json({ ...order, statusHistory });
   } catch (err) {
     next(err);
   }
@@ -580,6 +672,11 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
       where: { id: req.params.id },
       data: { status: req.body.status }
     });
+    await writeAuditLog(req.user?.id ?? null, "order.status_changed", "order", order.id, {
+      from: previousOrder.status,
+      to: order.status,
+      paymentStatus: order.paymentStatus
+    });
     if (shouldDeductStockForOrderState(order.status, order.paymentStatus)) {
       await ensureOrderStockDeducted(order.id);
     }
@@ -594,6 +691,12 @@ export async function updateOrderStatus(req: Request, res: Response, next: NextF
 
 export async function updateOrderPaymentStatus(req: Request, res: Response, next: NextFunction) {
   try {
+    const previous = await prisma.order.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, status: true, paymentStatus: true }
+    });
+    if (!previous) throw new ApiError(404, "not_found", "Order not found");
+
     const order = await prisma.order.update({
       where: { id: req.params.id },
       data: { paymentStatus: req.body.paymentStatus }
@@ -605,6 +708,11 @@ export async function updateOrderPaymentStatus(req: Request, res: Response, next
     if (shouldDeductStockForOrderState(order.status, order.paymentStatus)) {
       await ensureOrderStockDeducted(order.id);
     }
+    await writeAuditLog(req.user?.id ?? null, "order.payment_status_changed", "order", order.id, {
+      from: previous.paymentStatus,
+      to: order.paymentStatus,
+      status: order.status
+    });
     res.json(order);
   } catch (err) {
     next(err);

@@ -15,8 +15,13 @@ import {
   createProductSchema,
   deleteImage,
   deleteImageSchema,
+  idParamSchema,
+  getOrder,
   listOrders,
+  listOrderItems,
   listProducts,
+  updateOrderPaymentStatus,
+  updatePaymentStatusSchema,
   updateOrderStatus,
   updateOrderStatusSchema,
   updateProductHandler,
@@ -51,4 +56,12 @@ backofficeRouter.delete(
 backofficeRouter.post("/stock/adjust", permit("product:update"), validate(adjustStockSchema), adjustStockHandler);
 
 backofficeRouter.get("/orders", permit("order:read"), listOrders);
+backofficeRouter.get("/orders/:id", permit("order:read"), validate(idParamSchema), getOrder);
+backofficeRouter.get("/orders/:id/items", permit("order:read"), validate(idParamSchema), listOrderItems);
 backofficeRouter.patch("/orders/:id/status", permit("order:updateStatus"), validate(updateOrderStatusSchema), updateOrderStatus);
+backofficeRouter.patch(
+  "/orders/:id/payment-status",
+  permit("order:updateStatus"),
+  validate(updatePaymentStatusSchema),
+  updateOrderPaymentStatus
+);

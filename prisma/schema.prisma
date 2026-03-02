@@ -9,6 +9,7 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 enum ProductStatus {
@@ -287,6 +288,7 @@ model CartItem {
 
 model Order {
   id            String        @id @default(uuid()) @db.Char(36)
+  orderNumber   String?       @unique @db.VarChar(24)
   userId        String        @db.Char(36)
   user          User          @relation(fields: [userId], references: [id])
   status        OrderStatus   @default(PENDING)
@@ -297,10 +299,22 @@ model Order {
   coupon        Coupon?       @relation(fields: [couponId], references: [id])
   currency      String        @default("MZN") @db.VarChar(3)
   paymentStatus PaymentStatus @default(PENDING)
+  customerNameSnapshot    String? @db.VarChar(120)
+  customerEmailSnapshot   String? @db.VarChar(255)
+  customerPhoneSnapshot   String? @db.VarChar(30)
+  shippingAddressSnapshot Json?
   items         OrderItem[]
   payment       Payment?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([userId])
+  @@index([total])
+  @@index([customerEmailSnapshot])
+  @@index([customerPhoneSnapshot])
 }
 
 model Coupon {

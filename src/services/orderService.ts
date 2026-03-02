@@ -41,6 +41,20 @@ export type CheckoutOrder = Prisma.OrderGetPayload<{
   include: { items: true; payment: true };
 }>;
 
+async function generateNextOrderNumber(tx: Prisma.TransactionClient, date: Date) {
+  const year = date.getFullYear();
+  const prefix = `PED-${year}-`;
+  const last = await tx.order.findFirst({
+    where: { orderNumber: { startsWith: prefix } },
+    orderBy: { orderNumber: "desc" },
+    select: { orderNumber: true }
+  });
+  const lastSeqRaw = last?.orderNumber?.slice(prefix.length) ?? "0";
+  const lastSeq = Number.parseInt(lastSeqRaw, 10);
+  const nextSeq = Number.isFinite(lastSeq) ? lastSeq + 1 : 1;
+  return `${prefix}${String(nextSeq).padStart(6, "0")}`;
+}
+
 export async function getCheckoutSummary(userId: string, couponCode?: string | null) {
   const cart = await prisma.cart.findUnique({
     where: { userId },
@@ -73,7 +87,8 @@ export async function getCheckoutSummary(userId: string, couponCode?: string | n
 export async function checkoutCart(
   userId: string,
   couponCode?: string | null,
-  paymentProvider?: string | null
+  paymentProvider?: string | null,
+  customerPhoneOverride?: string | null
 ): Promise<CheckoutOrder> {
   const cart = await prisma.cart.findUnique({
     where: { userId },
@@ -87,74 +102,123 @@ export async function checkoutCart(
   const subtotal = cart.items.reduce((acc, item) => acc + Number(item.priceSnapshot) * item.quantity, 0);
   const normalized = normalizeCouponCode(couponCode ?? undefined);
 
-  return prisma.$transaction(async (tx) => {
-    let couponId: string | null = null;
-    let couponCodeSnapshot: string | null = null;
-    let discountTotal = 0;
+  const now = new Date();
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const order = await prisma.$transaction(async (tx) => {
+        let couponId: string | null = null;
+        let couponCodeSnapshot: string | null = null;
+        let discountTotal = 0;
 
-    if (normalized) {
-      const resolved = await resolveCoupon(tx, normalized, subtotal);
-      couponId = resolved.coupon.id;
-      couponCodeSnapshot = resolved.coupon.code;
-      discountTotal = resolved.discountTotal;
+        if (normalized) {
+          const resolved = await resolveCoupon(tx, normalized, subtotal);
+          couponId = resolved.coupon.id;
+          couponCodeSnapshot = resolved.coupon.code;
+          discountTotal = resolved.discountTotal;
 
-      await tx.coupon.update({
-        where: { id: resolved.coupon.id },
-        data: { redemptionCount: { increment: 1 } }
-      });
-    }
-
-    const total = Math.max(0, subtotal - discountTotal);
-    const variantIds = Array.from(
-      new Set(
-        cart.items
-          .map((item) => item.variantId)
-          .filter((id): id is string => Boolean(id))
-      )
-    );
-    const variants = variantIds.length
-      ? await tx.productVariant.findMany({
-          where: { id: { in: variantIds } },
-          select: { id: true, attributes: true }
-        })
-      : [];
-    const variantCostMap = new Map(variants.map((variant) => [variant.id, extractCostFromAttributes(variant.attributes)]));
-
-    const order = await tx.order.create({
-      data: {
-        userId,
-        total,
-        discountTotal,
-        couponId,
-        couponCode: couponCodeSnapshot,
-        items: {
-          create: cart.items.map((item) => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            quantity: item.quantity,
-            priceSnapshot: item.priceSnapshot,
-            nameSnapshot: item.nameSnapshot,
-            skuSnapshot: item.skuSnapshot,
-            attributesSnapshot: normalizeAttributesSnapshot(item.attributesSnapshot, {
-              costPriceSnapshot: item.variantId ? variantCostMap.get(item.variantId) ?? 0 : 0
-            })
-          }))
-        },
-        payment: {
-          create: {
-            amount: total,
-            status: "PENDING",
-            provider: paymentProvider ?? null
-          }
+          await tx.coupon.update({
+            where: { id: resolved.coupon.id },
+            data: { redemptionCount: { increment: 1 } }
+          });
         }
-      },
-      include: { items: true, payment: true }
-    });
 
-    await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+        const total = Math.max(0, subtotal - discountTotal);
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+          include: {
+            addresses: {
+              where: { isDefault: true },
+              take: 1
+            }
+          }
+        });
+        const fallbackAddress = user?.addresses?.[0] ?? (await tx.address.findFirst({ where: { userId }, orderBy: { updatedAt: "desc" } }));
+        const shippingAddressSnapshot = fallbackAddress
+          ? {
+              id: fallbackAddress.id,
+              name: fallbackAddress.name,
+              line1: fallbackAddress.line1,
+              line2: fallbackAddress.line2,
+              city: fallbackAddress.city,
+              state: fallbackAddress.state,
+              postalCode: fallbackAddress.postalCode,
+              country: fallbackAddress.country,
+              phone: fallbackAddress.phone
+            }
+          : null;
+        const orderNumber = await generateNextOrderNumber(tx, now);
+        const variantIds = Array.from(
+          new Set(
+            cart.items
+              .map((item) => item.variantId)
+              .filter((id): id is string => Boolean(id))
+          )
+        );
+        const variants = variantIds.length
+          ? await tx.productVariant.findMany({
+              where: { id: { in: variantIds } },
+              select: { id: true, attributes: true }
+            })
+          : [];
+        const variantCostMap = new Map(variants.map((variant) => [variant.id, extractCostFromAttributes(variant.attributes)]));
 
-    return order;
-  });
+        const order = await tx.order.create({
+          data: {
+            orderNumber,
+            userId,
+            total,
+            discountTotal,
+            couponId,
+            couponCode: couponCodeSnapshot,
+            customerNameSnapshot: user?.name ?? null,
+            customerEmailSnapshot: user?.email ?? null,
+            customerPhoneSnapshot: customerPhoneOverride?.trim() || fallbackAddress?.phone || null,
+            shippingAddressSnapshot: shippingAddressSnapshot
+              ? (shippingAddressSnapshot as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            items: {
+              create: cart.items.map((item) => ({
+                productId: item.productId,
+                variantId: item.variantId,
+                quantity: item.quantity,
+                priceSnapshot: item.priceSnapshot,
+                nameSnapshot: item.nameSnapshot,
+                skuSnapshot: item.skuSnapshot,
+                attributesSnapshot: normalizeAttributesSnapshot(item.attributesSnapshot, {
+                  costPriceSnapshot: item.variantId ? variantCostMap.get(item.variantId) ?? 0 : 0
+                })
+              }))
+            },
+            payment: {
+              create: {
+                amount: total,
+                status: "PENDING",
+                provider: paymentProvider ?? null
+              }
+            }
+          },
+          include: { items: true, payment: true }
+        });
+
+        await tx.cartItem.deleteMany({ where: { cartId: cart.id } });
+
+        return order;
+      });
+      return order;
+    } catch (error) {
+      const isUniqueOrderNumber =
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002" &&
+        Array.isArray(error.meta?.target) &&
+        (error.meta?.target as string[]).includes("orderNumber");
+      if (!isUniqueOrderNumber || attempt === attempts) {
+        throw error;
+      }
+    }
+  }
+
+  throw new ApiError(500, "order_number_generation_failed", "Could not generate order number");
 }
 
 export async function updateOrderStatus(orderId: string, status: "PENDING" | "PAID" | "SHIPPED" | "CANCELED") {
